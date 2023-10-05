@@ -48,35 +48,30 @@ async def handle_media(message: types.Message):
             'content_type': message.content_type
         }
 
-        # Чтение содержимого JSON-файла
-        with open('media.json', 'r') as f:
-            data = json.load(f)
+    elif message.content_type == 'video':
+        media[message.message_id] = {
+            'media_group_id': message.media_group_id,
+            'file_id': message.video.file_id,
+            'content_type': message.content_type
+        }
 
-        # Добавление к текущей информации в json новую
-        data.update(media)
+    # Чтение содержимого JSON-файла
+    with open('media.json', 'r') as f:
+        data = json.load(f)
 
-        # Запись в json обновлённой информации
-        with open('media.json', 'w') as f:
-            json.dump(data, f, indent=4)
-            # Очистка содержимого переменной media
-            media.clear()
+    # Добавление к текущей информации в json новую
+    data.update(media)
 
-        # with open('media.json', 'r') as f:
-        #     # Добавялеем информацию о фото в json из переменной media
-        #     json.dump(media, f, indent=4)
-        #     print(media)
-        #     media.clear()
-        #     print(f'Теперь пуст {media}')
+    # Запись в json обновлённой информации
+    with open('media.json', 'w') as f:
+        json.dump(data, f, indent=4)
+        # Очистка содержимого переменной media
+        media.clear()
 
-    # elif message.content_type == 'video':
-    #     photo_info = [message.media_group_id, message.message_id, message.video.file_id, message.content_type]
-    #     media.append(photo_info)
+
     #
-    #     with open('media.json', 'w') as f:
-    #         # Добавялеем информацию о видео в json из переменной media
-    #         json.dump(media, f)
-
-    # # Очищаем информацию о фото и видео из переменной media
+    #
+    # # # Очищаем информацию о фото и видео из переменной media
     # # media.clear()
     #
     # # пауза перед отправкой
