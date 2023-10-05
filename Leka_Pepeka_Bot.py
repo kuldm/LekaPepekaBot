@@ -1,15 +1,11 @@
 import os
 import asyncio
-from datetime import datetime
 
-import random
-
-import pytz
-import aiogram
 from aiogram import Bot, Dispatcher, executor, types
+
 from dotenv import load_dotenv
 
-import json
+from src import load_data, save_data, read_sending_message_id, read_sending_data
 
 # Загрузка токена и ID канала из файла .env
 load_dotenv()
@@ -24,6 +20,7 @@ time_sleep = int(os.getenv('TIME_SLEEP'))
 bot = Bot(token=token)
 dp = Dispatcher(bot=bot)
 
+# Переменная в которую временно добавляются данные о присланных файлах
 media = {}
 
 
@@ -45,101 +42,69 @@ async def handle_media(message: types.Message):
         media[message.message_id] = {
             'media_group_id': message.media_group_id,
             'file_id': message.photo[-1].file_id,
-            'content_type': message.content_type
+            'content_type': message.content_type,
+            'message_id': message.message_id
         }
 
     elif message.content_type == 'video':
         media[message.message_id] = {
             'media_group_id': message.media_group_id,
             'file_id': message.video.file_id,
-            'content_type': message.content_type
+            'content_type': message.content_type,
+            'message_id': message.message_id
         }
 
     # Чтение содержимого JSON-файла
-    with open('media.json', 'r') as f:
-        data = json.load(f)
+    data = load_data()
 
     # Добавление к текущей информации в json новую
     data.update(media)
 
     # Запись в json обновлённой информации
-    with open('media.json', 'w') as f:
-        json.dump(data, f, indent=4)
-        # Очистка содержимого переменной media
-        media.clear()
+    save_data(data)
+
+    # Очистка словаря media
+    media.clear()
 
 
-    #
-    #
-    # # # Очищаем информацию о фото и видео из переменной media
-    # # media.clear()
-    #
-    # # пауза перед отправкой
-    # await asyncio.sleep(15)
-    #
-    # with open('media.json') as f:
-    #     data = json.load(f)
-    #     # Распаковываем список списков
-    #     for i in data:
-    #         # Проверяем, это 1 сообщение или это несколько файлов в сообщении(Если None то в сообщении один файл)
-    #         if i[0] is None:
-    #             # Если тип файла фото, то отправляем фото
-    #             if i[-1] == 'photo':
-    #                 await bot.send_photo(channel_id, i[-2])
-    #             elif i[-1] == 'video':
-    #                 await bot.send_video(channel_id, i[-2])
-    #
-    #             # удаляем из списка информацию об отправленном фото
-    #             del data[data.index(i)]
-    #             # Удаляем из списка медиа наш элемент потому что там он тоже хранится, а иначе он повторно перезапишется когда боту будет отправлен новый файл
-    #             media.remove(i)
-    #
-    #             # Записываем обновлённую информацию в наш список.
-    #             with open('media.json', 'w') as f:
-    #                 json.dump(data, f)
-    #
-    #
-    #         elif i[0] is not None:
-    #             # Сюда записываются id файлов для отправки медиа группой
-    #             group_files_id =[]
-    #             # Это id группы сообщений для сравнения с ним в цикле
-    #             media_group_id = data[0][0]
-    #             if i[-1] == 'photo':
-    #                 for i in data:
-    #                     if i[0] == media_group_id:
-    #                         # Добавление id файла в список
-    #                         group_files_id.append(i[-2])
-    #                     else:
-    #                         pass
-    #
-    #                 await bot.send_media_group(channel_id, [types.InputMediaPhoto(files) for files in group_files_id])
-    #
-    #
-    #                 # Удаляю из медиа файлы которые были отправлены. Удаляются первые элементы к оличестве штук отправленных фото
-    #
-    #
-    #             elif i[-1] == 'video':
-    #                 await bot.send_video(channel_id, i[-2])
-    #
-    #             # print(media)
-    #             print(data)
-    #
-    #
-    #             for i in range(0, len(group_files_id)):
-    #                 del media[0]
-    #                 with open('media.json', 'w') as f:
-    #                     json.dump(data, f)
-    #
-    #                 for i in range(0, len(group_files_id)):
-    #                     del data[0]
-    #                     with open('media.json', 'w') as f:
-    #                         json.dump(data, f)
-    #
-    #
-    #             # # Записываем обновлённую информацию в наш список.
-    #             # with open('media.json', 'w') as f:
-    #             #     json.dump(data, f)
+# Функция для отправки сообщений с медиа
+async def send_media_messages(sending_media_data):
+    media_group = []
 
+    for media_item in sending_media_data:
+        if media_item['content_type'] == 'photo':
+            media_group.append(types.InputMediaPhoto(media=media_item['file_id']))
+        elif media_item['content_type'] == 'video':
+            media_group.append(types.InputMediaVideo(media=media_item['file_id']))
+
+    await bot.send_media_group(channel_id, media=media_group)
+
+    # После успешной отправки удаляем информацию из JSON
+    data = load_data()
+    for i in read_sending_message_id():
+        if i in data:
+            del data[i]
+            save_data(data)
+
+
+# Функция для отправки сообщений каждый час
+async def send_periodic_messages():
+    while True:
+        # Если в JSON есть что отправлять, то отправляем
+        # if load_data():
+        try:
+            # Передаём список словарей которые нужно отправить
+            await send_media_messages(read_sending_data())
+
+            await asyncio.sleep(10)  # Пауза 1 час
+        # Если JSON пуст то отправялем сообщение и ждём
+        # if not load_data():
+        except IndexError:
+            await bot.send_message(234565580, 'ALARM! Закончились мемы, кидай ещё срочно!')
+            await asyncio.sleep(30)
+# IndexError: list index out of range
 
 if __name__ == '__main__':
-    executor.start_polling(dp)
+    loop = asyncio.get_event_loop()
+    loop.create_task(send_periodic_messages())
+    executor.start_polling(dp, skip_updates=True)
