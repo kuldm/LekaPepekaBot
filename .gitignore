@@ -1,0 +1,14 @@
+.env
+
+media.json
+media.txt
+models.py
+prprka_bot.py
+prprka_bot_5.py
+test.py
+test1.py
+
+.idea/
+__pycache__
+lekapepeka_venv/
+src/
