@@ -1,6 +1,7 @@
 # Загрузка данных из JSON-файла
 import json
 
+
 # Выгрузка данных из JSON-файла
 def load_data():
     with open('media.json', 'r') as json_file:
@@ -14,9 +15,8 @@ def save_data(data):
         json.dump(data, json_file, indent=4)
 
 
-
 # Функция которая возвращает список словарей с данными о файлах которые нужно будет отправить
-def read_sending_data():
+def sending_media_data():
     # Загрузка данных из вашего JSON-файл
     data = load_data()
 
@@ -40,7 +40,7 @@ def read_sending_data():
 
 
 # Функция которая возвращает список message_id чтобы потом из JSON-файла удалить эти ключи
-def read_sending_message_id():
+def sending_message_id():
     # Загрузка данных из вашего JSON-файл
     data = load_data()
 
@@ -59,7 +59,7 @@ def read_sending_message_id():
 
     # Если first_value равно None, добавляем первое значение целиком
     elif first_key is not None:
-        # добавляем message_id
+        # Добавляем message_id
         sending_message_id.append(list(data.keys())[0])
 
     return sending_message_id

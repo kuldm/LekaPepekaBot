@@ -5,19 +5,11 @@ from aiogram import Bot, Dispatcher, executor, types
 
 from dotenv import load_dotenv
 
-from src import load_data, save_data, read_sending_message_id, read_sending_data
-
-# Загрузка токена и ID канала из файла .env
-load_dotenv()
-
-# Константы с путём
-channel_id = os.getenv('CHANNEL_ID')
-media_path = os.getenv('MEDIA_PATH')
-token = os.getenv('TOKEN')
-time_sleep = int(os.getenv('TIME_SLEEP'))
+from config import TOKEN, CHANNEL_ID, MY_TG_ID
+from src import load_data, save_data, sending_message_id, sending_media_data
 
 # Создание бота и диспетчера
-bot = Bot(token=token)
+bot = Bot(token=TOKEN)
 dp = Dispatcher(bot=bot)
 
 # Переменная в которую временно добавляются данные о присланных файлах
@@ -62,6 +54,7 @@ async def handle_media(message: types.Message):
 
     # Запись в json обновлённой информации
     save_data(data)
+    await bot.send_message(MY_TG_ID, 'Мем сохранён 😎')
 
     # Очистка словаря media
     media.clear()
@@ -69,19 +62,20 @@ async def handle_media(message: types.Message):
 
 # Функция для отправки сообщений с медиа
 async def send_media_messages(sending_media_data):
+    # Переменная в которую добавляются id файлов для отправки в чат
     media_group = []
-
+    # Проходимся по всем Файлам и добавляем id в media_group исходя из типа контента
     for media_item in sending_media_data:
         if media_item['content_type'] == 'photo':
             media_group.append(types.InputMediaPhoto(media=media_item['file_id']))
         elif media_item['content_type'] == 'video':
             media_group.append(types.InputMediaVideo(media=media_item['file_id']))
 
-    await bot.send_media_group(channel_id, media=media_group)
+    await bot.send_media_group(CHANNEL_ID, media=media_group)
 
-    # После успешной отправки удаляем информацию из JSON
+    # После успешной отправки удаляем информацию об отправленных файлах из JSON
     data = load_data()
-    for i in read_sending_message_id():
+    for i in sending_message_id():
         if i in data:
             del data[i]
             save_data(data)
@@ -90,19 +84,16 @@ async def send_media_messages(sending_media_data):
 # Функция для отправки сообщений каждый час
 async def send_periodic_messages():
     while True:
-        # Если в JSON есть что отправлять, то отправляем
-        # if load_data():
         try:
             # Передаём список словарей которые нужно отправить
-            await send_media_messages(read_sending_data())
+            await send_media_messages(sending_media_data())
 
-            await asyncio.sleep(10)  # Пауза 1 час
-        # Если JSON пуст то отправялем сообщение и ждём
-        # if not load_data():
+            await asyncio.sleep(10)  # Интервал отправки сообщений 10 секунд
+
         except IndexError:
-            await bot.send_message(234565580, 'ALARM! Закончились мемы, кидай ещё срочно!')
-            await asyncio.sleep(30)
-# IndexError: list index out of range
+            await bot.send_message(MY_TG_ID, 'ALARM! Закончились мемы, кидай ещё срочно!')
+            await asyncio.sleep(60)  # Интервал прдупреждений о том что закончились мемы
+
 
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()
