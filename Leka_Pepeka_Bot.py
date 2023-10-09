@@ -1,9 +1,12 @@
 import os
 import asyncio
+from datetime import datetime
+import random
 
 from aiogram import Bot, Dispatcher, executor, types
 
-from dotenv import load_dotenv
+
+import pytz
 
 from config import TOKEN, CHANNEL_ID, MY_TG_ID
 from src import load_data, save_data, sending_message_id, sending_media_data
@@ -11,9 +14,6 @@ from src import load_data, save_data, sending_message_id, sending_media_data
 # Создание бота и диспетчера
 bot = Bot(token=TOKEN)
 dp = Dispatcher(bot=bot)
-
-# Переменная в которую временно добавляются данные о присланных файлах
-media = {}
 
 
 # Обработчик команды /start
@@ -29,6 +29,9 @@ async def cmd_start(message: types.Message):
 
 @dp.message_handler(content_types=['photo', 'video'])
 async def handle_media(message: types.Message):
+    # Переменная в которую временно добавляются данные о присланных файлах
+    media = {}
+
     if message.content_type == 'photo':
         # Добавление в media в котором ключ это id сообщения всю необходимую информацию
         media[message.message_id] = {
@@ -46,18 +49,11 @@ async def handle_media(message: types.Message):
             'message_id': message.message_id
         }
 
-    # Чтение содержимого JSON-файла
-    data = load_data()
-
-    # Добавление к текущей информации в json новую
-    data.update(media)
-
-    # Запись в json обновлённой информации
-    save_data(data)
-    await bot.send_message(MY_TG_ID, 'Мем сохранён 😎')
-
-    # Очистка словаря media
-    media.clear()
+    data = load_data()  # Чтение содержимого JSON-файла
+    data.update(media)  # Добавление к текущей информации в json новую
+    save_data(data)  # Запись в json обновлённой информации
+    media.clear()  # Очистка словаря media
+    # await bot.send_message(MY_TG_ID, 'Мем сохранён 😎')
 
 
 # Функция для отправки сообщений с медиа
@@ -81,18 +77,44 @@ async def send_media_messages(sending_media_data):
             save_data(data)
 
 
-# Функция для отправки сообщений каждый час
+# Функция для отправки сообщений
 async def send_periodic_messages():
     while True:
         try:
-            # Передаём список словарей которые нужно отправить
-            await send_media_messages(sending_media_data())
+            now = datetime.now(pytz.timezone('Europe/Moscow'))
+            day_of_week = now.weekday()
 
-            await asyncio.sleep(10)  # Интервал отправки сообщений 10 секунд
+            # Определите интервалы времени для каждого дня недели (в формате (час, минута))
+            # В этом примере отправка происходит с понедельника по воскресенье
+            schedules = {
+                0: [(8, 45), (23, 50)],  # Понедельник
+                1: [(8, 45), (23, 50)],  # Вторник
+                2: [(8, 45), (23, 50)],  # Среда
+                3: [(8, 45), (23, 50)],  # Четверг
+                4: [(8, 45), (23, 50)],  # Пятница
+                5: [(8, 45), (23, 50)],  # Суббота
+                6: [(8, 45), (23, 50)]  # Воскресенье
+            }
+
+            current_time = (now.hour, now.minute)  # Текущее время
+            random_time_sleep = random.randrange(3500, 3601)  # Случайное время отправки сообщения
+
+            # Проверяем, находится ли текущее время в интервале для текущего дня недели
+            if current_time >= schedules[day_of_week][0] and current_time <= schedules[day_of_week][1]:
+                # Если в текущий интервал времени, то отправляем сообщения
+                await send_media_messages(sending_media_data())
+                await asyncio.sleep(random_time_sleep)  # Интервал отправки сообщений 60 минут
+            else:
+                # Если не в интервале, ждем до ближайшего интервала
+                next_schedule = schedules[day_of_week][0]
+                next_schedule_datetime = now.replace(hour=next_schedule[0], minute=next_schedule[1], second=0,
+                                                     microsecond=0)
+                time_until_next_schedule = (next_schedule_datetime - now).total_seconds()
+                await asyncio.sleep(time_until_next_schedule)
 
         except IndexError:
             await bot.send_message(MY_TG_ID, 'ALARM! Закончились мемы, кидай ещё срочно!')
-            await asyncio.sleep(60)  # Интервал прдупреждений о том что закончились мемы
+            await asyncio.sleep(60)  # Интервал предупреждений о том, что закончились мемы
 
 
 if __name__ == '__main__':
